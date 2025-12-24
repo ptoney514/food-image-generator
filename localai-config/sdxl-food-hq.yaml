@@ -1,0 +1,19 @@
+name: sdxl-food-hq
+parameters:
+  model: stabilityai/stable-diffusion-xl-base-1.0
+  backend: diffusers
+  step: 30
+  f16: true
+  cuda: false
+  diffusers:
+    pipeline_type: StableDiffusionXLPipeline
+    scheduler_type: k_dpmpp_2m
+    enable_parameters: "negative_prompt,num_inference_steps,clip_skip"
+    cfg_scale: 7.0
+    clip_skip: 0
+
+# Optional: Uncomment to add food photography LoRA
+# lora_adapters:
+#   - /Users/YOUR_USERNAME/LocalAI/models/loras/food-photography-xl.safetensors
+# lora_scales:
+#   - 0.75

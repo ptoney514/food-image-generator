@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+LocalAI/
+test-output.png
+*.png
+*.jpg
+*.jpeg
+*.webp
