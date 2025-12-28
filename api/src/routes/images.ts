@@ -7,6 +7,9 @@ import { generateImage, StabilityAIError } from '../lib/stability-ai';
 import { buildPrompt } from '../lib/prompt-builder';
 import { generatedImages, type ImageStyle } from '../db/schema';
 
+// Note: List, Get, and Delete routes require Hyperdrive for database access.
+// The Generate route works without database - it returns R2 URLs directly.
+
 const images = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // Request validation schemas
@@ -28,9 +31,9 @@ const listQuerySchema = z.object({
 /**
  * POST /images/generate
  * Generate a new food image from recipe data
+ * Returns the R2 URL - client app handles persistence to their database
  */
 images.post('/generate', async (c) => {
-  const db = c.get('db');
   const { userId } = getAuthUser(c);
 
   // Parse and validate request body
@@ -78,33 +81,15 @@ images.post('/generate', async (c) => {
     // Build public URL
     const imageUrl = `${c.env.R2_PUBLIC_URL}/${r2Key}`;
 
-    // Insert into database (using userId as owner)
-    const [inserted] = await db
-      .insert(generatedImages)
-      .values({
-        id: imageId,
-        householdId: userId,
-        recipeId: recipeId || null,
-        imageUrl,
-        r2Key,
-        prompt: positive,
-        negativePrompt: negative,
-        style: style as ImageStyle,
-        aspectRatio: '1:1',
-        sourceTitle: title,
-        sourceCategory: category || null,
-        sourceIngredients: ingredients ? JSON.stringify(ingredients) : null,
-        fileSize: imageBuffer.byteLength,
-        contentType,
-      })
-      .returning();
-
+    // Return the image URL - client app handles persistence to their own database
     return c.json({
-      id: inserted.id,
-      imageUrl: inserted.imageUrl,
-      style: inserted.style,
-      prompt: inserted.prompt,
-      createdAt: inserted.createdAt,
+      id: imageId,
+      imageUrl,
+      r2Key,
+      style,
+      prompt: positive,
+      fileSize: imageBuffer.byteLength,
+      createdAt: new Date().toISOString(),
     });
   } catch (error) {
     if (error instanceof StabilityAIError) {
@@ -113,8 +98,19 @@ images.post('/generate', async (c) => {
         error.statusCode as 400 | 401 | 402 | 429 | 500
       );
     }
-    console.error('Image generation failed:', error);
-    return c.json({ error: 'Failed to generate image' }, 500);
+
+    // Enhanced error logging for debugging
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error('Image generation failed:', { message: errorMessage, stack: errorStack });
+
+    return c.json({
+      error: 'Failed to generate image',
+      debug: {
+        message: errorMessage,
+        type: error instanceof Error ? error.constructor.name : typeof error,
+      },
+    }, 500);
   }
 });
 

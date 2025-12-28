@@ -44,7 +44,7 @@ export async function generateImage(
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      Accept: 'image/*',
+      Accept: 'application/json',
     },
     body: formData,
   });
@@ -73,11 +73,28 @@ export async function generateImage(
     throw new StabilityAIError(errorMessage, response.status, errorText);
   }
 
-  const imageBuffer = await response.arrayBuffer();
-  const contentType = response.headers.get('content-type') || 'image/png';
+  // Parse JSON response with base64-encoded image
+  const jsonResponse = await response.json() as { image?: string; images?: Array<{ base64: string }> };
+
+  // Handle different response formats
+  let base64Image: string;
+  if (jsonResponse.image) {
+    base64Image = jsonResponse.image;
+  } else if (jsonResponse.images?.[0]?.base64) {
+    base64Image = jsonResponse.images[0].base64;
+  } else {
+    throw new StabilityAIError('Unexpected response format from Stability AI', 500, JSON.stringify(jsonResponse));
+  }
+
+  // Convert base64 to ArrayBuffer
+  const binaryString = atob(base64Image);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
 
   return {
-    imageBuffer,
-    contentType,
+    imageBuffer: bytes.buffer,
+    contentType: 'image/png',
   };
 }
