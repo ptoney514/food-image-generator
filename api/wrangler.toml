@@ -8,10 +8,9 @@ compatibility_flags = ["nodejs_compat"]
 port = 8788
 
 # R2 bucket binding for image storage
-# Update bucket_name to match your existing R2 bucket
 [[r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "recipe-images"
+bucket_name = "pairdish-images"
 
 # Environment variables (set via wrangler secret or .dev.vars)
 # Required secrets:
