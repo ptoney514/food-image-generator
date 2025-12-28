@@ -4,6 +4,9 @@ import { logger } from 'hono/logger';
 import type { Bindings, Variables } from './lib/types';
 import { createDb } from './db/client';
 import { authMiddleware } from './lib/supabase-auth';
+import { rateLimiters } from './lib/rate-limiter';
+import { getLandingPageHTML } from './lib/landing-page';
+import { openApiSpec, getSwaggerUIHTML } from './lib/openapi';
 import images from './routes/images';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -38,31 +41,60 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Health check (no auth required)
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', service: 'food-image-api' });
-});
+// ============================================
+// Public Routes (no auth required)
+// ============================================
 
-// API info (no auth required)
+// Landing page with HTML
 app.get('/', (c) => {
-  return c.json({
-    name: 'Food Image Generator API',
-    version: '1.0.0',
-    endpoints: {
-      health: 'GET /health',
-      generate: 'POST /images/generate',
-      list: 'GET /images',
-      get: 'GET /images/:id',
-      delete: 'DELETE /images/:id',
-    },
-  });
+  const baseUrl = new URL(c.req.url).origin;
+  return c.html(getLandingPageHTML(baseUrl));
 });
 
-// Protected routes - require authentication
-app.use('/images/*', authMiddleware);
+// Health check
+app.get('/health', (c) => {
+  return c.json({ status: 'ok', service: 'food-image-api', version: '1.0.0' });
+});
 
-// Mount image routes
-app.route('/images', images);
+// OpenAPI spec (JSON)
+app.get('/openapi.json', (c) => {
+  return c.json(openApiSpec);
+});
+
+// Swagger UI documentation
+app.get('/docs', (c) => {
+  const baseUrl = new URL(c.req.url).origin;
+  return c.html(getSwaggerUIHTML(`${baseUrl}/openapi.json`));
+});
+
+// ============================================
+// API v1 Routes (auth required)
+// ============================================
+
+// Apply auth middleware to all v1 routes
+app.use('/v1/*', authMiddleware);
+
+// Apply rate limiting to image generation
+app.use('/v1/images/generate', rateLimiters.imageGeneration);
+
+// Apply standard rate limiting to other image routes
+app.use('/v1/images/*', rateLimiters.standard);
+
+// Mount image routes under /v1
+app.route('/v1/images', images);
+
+// ============================================
+// Legacy routes (redirect to v1)
+// ============================================
+
+app.all('/images/*', (c) => {
+  const newPath = c.req.path.replace('/images', '/v1/images');
+  return c.redirect(newPath, 301);
+});
+
+// ============================================
+// Error Handling
+// ============================================
 
 // Global error handler
 app.onError((error, c) => {
@@ -77,7 +109,7 @@ app.onError((error, c) => {
 
 // 404 handler
 app.notFound((c) => {
-  return c.json({ error: 'Not found' }, 404);
+  return c.json({ error: 'Not found', path: c.req.path }, 404);
 });
 
 export default app;
