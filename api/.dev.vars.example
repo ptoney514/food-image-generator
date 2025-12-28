@@ -1,0 +1,8 @@
+# Copy this to .dev.vars and fill in your values
+# These are used by wrangler dev for local development
+
+DATABASE_URL=postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+STABILITY_API_KEY=sk-your-stability-api-key
+R2_PUBLIC_URL=https://pub-xxx.r2.dev
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8081
