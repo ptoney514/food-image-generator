@@ -5,16 +5,11 @@ import type { Bindings, Variables } from './types';
 interface SupabaseJWTPayload {
   sub: string; // User ID
   email?: string;
-  app_metadata?: {
-    household_id?: string;
-  };
-  user_metadata?: {
-    household_id?: string;
-  };
 }
 
 /**
  * Middleware to verify Supabase JWT and extract user info
+ * Simplified: just verifies token is valid, no household check
  */
 export const authMiddleware: MiddlewareHandler<{
   Bindings: Bindings;
@@ -41,18 +36,8 @@ export const authMiddleware: MiddlewareHandler<{
       return c.json({ error: 'Invalid token: missing user ID' }, 401);
     }
 
-    // Extract household ID from app_metadata or user_metadata
-    const householdId =
-      jwtPayload.app_metadata?.household_id ||
-      jwtPayload.user_metadata?.household_id;
-
-    if (!householdId) {
-      return c.json({ error: 'User not associated with a household' }, 403);
-    }
-
-    // Set user info in context
+    // Set user ID in context
     c.set('userId', jwtPayload.sub);
-    c.set('householdId', householdId);
 
     await next();
   } catch (error) {
@@ -62,11 +47,10 @@ export const authMiddleware: MiddlewareHandler<{
 };
 
 /**
- * Helper to get authenticated user info from context
+ * Helper to get authenticated user ID from context
  */
 export function getAuthUser(c: Context<{ Bindings: Bindings; Variables: Variables }>) {
   return {
     userId: c.get('userId'),
-    householdId: c.get('householdId'),
   };
 }

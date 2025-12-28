@@ -18,7 +18,6 @@ export interface Variables {
   // Database client
   db: Database;
 
-  // Authenticated user info (from JWT)
+  // Authenticated user ID (from JWT)
   userId: string;
-  householdId: string;
 }

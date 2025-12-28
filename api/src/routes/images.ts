@@ -31,7 +31,7 @@ const listQuerySchema = z.object({
  */
 images.post('/generate', async (c) => {
   const db = c.get('db');
-  const { householdId } = getAuthUser(c);
+  const { userId } = getAuthUser(c);
 
   // Parse and validate request body
   const body = await c.req.json();
@@ -63,9 +63,9 @@ images.post('/generate', async (c) => {
       }
     );
 
-    // Generate R2 key
+    // Generate R2 key (using userId for path)
     const imageId = crypto.randomUUID();
-    const r2Key = `${householdId}/generated/${imageId}.png`;
+    const r2Key = `${userId}/generated/${imageId}.png`;
 
     // Upload to R2
     await c.env.R2_BUCKET.put(r2Key, imageBuffer, {
@@ -78,12 +78,12 @@ images.post('/generate', async (c) => {
     // Build public URL
     const imageUrl = `${c.env.R2_PUBLIC_URL}/${r2Key}`;
 
-    // Insert into database
+    // Insert into database (using userId as owner)
     const [inserted] = await db
       .insert(generatedImages)
       .values({
         id: imageId,
-        householdId,
+        householdId: userId,
         recipeId: recipeId || null,
         imageUrl,
         r2Key,
@@ -120,11 +120,11 @@ images.post('/generate', async (c) => {
 
 /**
  * GET /images
- * List all images for the authenticated household
+ * List all images for the authenticated user
  */
 images.get('/', async (c) => {
   const db = c.get('db');
-  const { householdId } = getAuthUser(c);
+  const { userId } = getAuthUser(c);
 
   // Parse query parameters
   const query = Object.fromEntries(new URL(c.req.url).searchParams);
@@ -140,7 +140,7 @@ images.get('/', async (c) => {
   const { limit, offset, style, recipeId } = parseResult.data;
 
   // Build query conditions
-  const conditions = [eq(generatedImages.householdId, householdId)];
+  const conditions = [eq(generatedImages.householdId, userId)];
 
   if (style) {
     conditions.push(eq(generatedImages.style, style));
@@ -182,7 +182,7 @@ images.get('/', async (c) => {
  */
 images.get('/:id', async (c) => {
   const db = c.get('db');
-  const { householdId } = getAuthUser(c);
+  const { userId } = getAuthUser(c);
   const imageId = c.req.param('id');
 
   // Validate UUID format
@@ -196,7 +196,7 @@ images.get('/:id', async (c) => {
     .where(
       and(
         eq(generatedImages.id, imageId),
-        eq(generatedImages.householdId, householdId)
+        eq(generatedImages.householdId, userId)
       )
     )
     .limit(1);
@@ -231,7 +231,7 @@ images.get('/:id', async (c) => {
  */
 images.delete('/:id', async (c) => {
   const db = c.get('db');
-  const { householdId } = getAuthUser(c);
+  const { userId } = getAuthUser(c);
   const imageId = c.req.param('id');
 
   // Validate UUID format
@@ -246,7 +246,7 @@ images.delete('/:id', async (c) => {
     .where(
       and(
         eq(generatedImages.id, imageId),
-        eq(generatedImages.householdId, householdId)
+        eq(generatedImages.householdId, userId)
       )
     )
     .limit(1);
